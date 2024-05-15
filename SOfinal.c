@@ -146,6 +146,7 @@ char* generateSnapshotFileName(const char *output_directory, const char *directo
     return snapshot_file_name;
 }
 // Funcție pentru verificarea drepturilor lipsă și izolarea fișierelor periculoase
+// Funcție pentru verificarea drepturilor lipsă și izolarea fișierelor periculoase
 void checkPermissionsAndIsolate(const char *output_directory, const char *isolated_space_dir, const char *dir_path) {
     DIR *dir = opendir(dir_path);
     if (dir == NULL) {
@@ -154,6 +155,8 @@ void checkPermissionsAndIsolate(const char *output_directory, const char *isolat
     }
 
     struct dirent *entry;
+    int dangerous_files_count = 0; // Contor pentru fișierele periculoase
+
     while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
@@ -199,6 +202,7 @@ void checkPermissionsAndIsolate(const char *output_directory, const char *isolat
                         perror("Nu s-a putut muta ");
                         exit(-9);
                     }
+                    exit(1); // Ieși din procesul copil cu codul de ieșire 1 pentru a marca un fișier periculos
                 }
                 pclose(pipe);
                 exit(0);
@@ -207,6 +211,17 @@ void checkPermissionsAndIsolate(const char *output_directory, const char *isolat
     }
 
     closedir(dir);
+
+    // Așteaptă terminarea proceselor copil
+    int status;
+    pid_t child_pid;
+    while ((child_pid = wait(&status)) != -1) {
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 1) {
+            dangerous_files_count++; // Incrementăm contorul pentru fiecare fișier periculos
+        }
+    }
+
+    printf("Procesul copil pentru directorul %s a găsit %d fișiere periculoase.\n", dir_path, dangerous_files_count);
 }
 
 int main(int argc, char *argv[]) {
